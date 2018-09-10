@@ -17,6 +17,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import com.jayway.jsonpath.JsonPath;
 
 public class HttpServer extends NanoHTTPD {
 
@@ -32,7 +33,7 @@ public class HttpServer extends NanoHTTPD {
 	 * Start a HTTP Server on port 8080
 	 */
 	public HttpServer() {
-		super(8080);
+		super(6666);
 
 		try {
 			start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
@@ -82,23 +83,16 @@ public class HttpServer extends NanoHTTPD {
 				byte[] buffer = new byte[contentLength];
 				session.getInputStream().read(buffer, 0, contentLength);
 				String body = new String(buffer);
-				LOG.debug("request =" + body);
+				LOG.info("request =" + body);
 
-				// Look for a functional identifier and a status
-				Matcher m = PATTERN_NOTIF.matcher(body);
-				if (m.matches() && m.groupCount() == 2) {
-					String functionalIdentifier = m.group(1);
-					String status = m.group(2);
-
-					LOG.debug("functionalIdentifier =" + functionalIdentifier);
-					LOG.debug("status =" + status);
-
+				try {
+					String content = JsonPath.read(body, "$.content.content");
 					// Notify the JMeter sample that response is received for this identifier
-					CompletableFuture<String> waiter = results.get(functionalIdentifier);
-					waiter.complete(status);
-				}
-				else {
-					LOG.error("Can not parse = " + body);
+					LOG.info("content: " +  content);
+					CompletableFuture<String> waiter = results.get(content);
+					waiter.complete(content);
+				} catch (Exception e) {
+					LOG.error("could not parse the response", e);
 				}
 
 			}

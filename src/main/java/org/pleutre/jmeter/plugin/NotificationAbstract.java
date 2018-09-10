@@ -15,7 +15,7 @@ public class NotificationAbstract extends AbstractJavaSamplerClient {
 
 	protected static final String FUNCTIONAL_ID = "FUNCTIONAL_ID";
 	
-	private static final HttpServer httpServer = new HttpServer();
+	//private static final HttpServer httpServer = new HttpServer();
 	
 	@Override
 	public SampleResult runTest(JavaSamplerContext context) {
