@@ -22,12 +22,11 @@ import com.jayway.jsonpath.JsonPath;
 public class HttpServer extends NanoHTTPD {
 
 	private static final Logger LOG = LoggingManager.getLoggerForClass();
-	
-	private String content;
-	
+
 	private static final ConcurrentHashMap<String, CompletableFuture<String>> results = new ConcurrentHashMap<String, CompletableFuture<String>>();
 
-	private static final Pattern PATTERN_NOTIF = Pattern.compile(".*FunctionalIdentifier>([+\\d]+)</.*StatusMessage>([\\w_]+)</.*");
+	private static final Pattern PATTERN_NOTIF = Pattern
+			.compile(".*FunctionalIdentifier>([+\\d]+)</.*StatusMessage>([\\w_]+)</.*");
 
 	/**
 	 * Start a HTTP Server on port 8080
@@ -37,40 +36,24 @@ public class HttpServer extends NanoHTTPD {
 
 		try {
 			start(NanoHTTPD.SOCKET_READ_TIMEOUT, false);
-			content = readReponseFile();
 			LOG.info("NanoHTTPD started");
-		} catch (URISyntaxException | IOException e) {
+		} catch (IOException e) {
 			LOG.info("Can not start NanoHTTPD", e);
 		}
 
 	}
 
 	/**
-	 * Read a sample response file
-	 * @return Content of the response file
-	 * @throws URISyntaxException if uri is not understood
-	 * @throws IOException if file can not be read/created
-	 */
-	private String readReponseFile() throws URISyntaxException, IOException {
-		URI uri = HttpServer.class.getResource("response.xml").toURI();
-		LOG.info("uri = " + uri);
-		Map<String, String> env = new HashMap<>(); 
-		env.put("create", "true");
-		FileSystems.newFileSystem(uri, env);
-		Path path = Paths.get(uri);
-		LOG.info("path = " + path);
-		return new String(Files.readAllBytes(path));
-	}
-
-	/**
 	 * Method called when HTTP server receive a request
 	 *
 	 * In my sample, the received request is XML
+	 * 
 	 * @param session
 	 * @return a HTTP response
 	 */
 	@Override
 	public Response serve(IHTTPSession session) {
+		String body = "";
 
 		try {
 			// In my sample, the received request always contains a content-length.
@@ -78,17 +61,15 @@ public class HttpServer extends NanoHTTPD {
 			String length = session.getHeaders().get("content-length");
 			if (length != null) {
 
-				// Read response
-				int contentLength = Integer.parseInt(length);
-				byte[] buffer = new byte[contentLength];
-				session.getInputStream().read(buffer, 0, contentLength);
-				String body = new String(buffer);
+				final HashMap<String, String> map = new HashMap<String, String>();
+				session.parseBody(map);
+				body = map.get("postData");
 				LOG.info("request =" + body);
 
 				try {
 					String content = JsonPath.read(body, "$.content.content");
 					// Notify the JMeter sample that response is received for this identifier
-					LOG.info("content: " +  content);
+					LOG.info("content: " + content);
 					CompletableFuture<String> waiter = results.get(content);
 					waiter.complete(content);
 				} catch (Exception e) {
@@ -97,18 +78,18 @@ public class HttpServer extends NanoHTTPD {
 
 			}
 		} catch (IOException e) {
-			LOG.info("Can not serve response = " + session, e);
+			LOG.info("Can not serve response = " + session + body, e);
+		} catch (ResponseException e1) {
+			LOG.info("Can not serve response = " + session + body, e1);
 		}
 
 		// constant response
-		return newFixedLengthResponse(NanoHTTPD.Response.Status.OK, "text/xml", content);
+		return newFixedLengthResponse(NanoHTTPD.Response.Status.ACCEPTED, "application/json", body);
 
 	}
 
 	public static ConcurrentHashMap<String, CompletableFuture<String>> getResults() {
 		return results;
 	}
-	
-	
-	
+
 }
